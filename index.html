@@ -1,532 +1,123 @@
-  <!DOCTYPE html>
-  <html lang="zh-CN">
+<!DOCTYPE html>
+  <html>
   <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>美食地图 - 毛毛美食指南</title>
-      <link rel="manifest" href="manifest.json">
-      <script src="https://webapi.amap.com/maps?v=2.0&key=52d44844a3d67363c77baf0d3269764e"></script>
-      <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F5F5F5;
-  height: 100vh; overflow: hidden; }
-          .loading { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #fff; display: flex;
-  flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
-          .loading-spinner { width: 50px; height: 50px; border: 4px solid #E0E0E0; border-top-color: #FF6B35;
-  border-radius: 50%; animation: spin 1s linear infinite; }
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .hidden { display: none !important; }
-
-          .header { background: #FF6B35; color: white; padding: 12px 16px; display: flex; align-items: center;
-  justify-content: space-between; }
-          .header h1 { font-size: 18px; }
-          .header-actions { display: flex; gap: 8px; }
-          .icon-btn { width: 36px; height: 36px; border: none; background: rgba(255,255,255,0.2); border-radius: 50%;
-  cursor: pointer; font-size: 18px; color: white; }
-
-          .stats-bar { background: #fff; display: flex; padding: 12px 16px; border-bottom: 1px solid #E0E0E0; }
-          .stat-item { flex: 1; text-align: center; }
-          .stat-value { display: block; font-size: 24px; font-weight: 700; color: #FF6B35; }
-          .stat-label { font-size: 12px; color: #666; }
-
-          .filter-bar { background: #fff; padding: 8px 16px; display: flex; gap: 8px; border-bottom: 1px solid #E0E0E0;
-  }
-          .search-box { flex: 1; position: relative; }
-          .search-box input { width: 100%; padding: 8px 32px 8px 12px; border: 1px solid #E0E0E0; border-radius: 20px;
-  font-size: 14px; }
-          #cuisineFilter { padding: 8px 12px; border: 1px solid #E0E0E0; border-radius: 20px; font-size: 14px; }
-
-          .tab-bar { background: #fff; display: flex; border-bottom: 1px solid #E0E0E0; }
-          .tab-btn { flex: 1; padding: 12px; border: none; background: none; font-size: 14px; cursor: pointer; color:
-  #666; }
-          .tab-btn.active { color: #FF6B35; font-weight: 600; border-bottom: 2px solid #FF6B35; }
-
-          .tab-content { display: none; height: calc(100vh - 200px); }
-          .tab-content.active { display: block; }
-
-          #mapContainer { width: 100%; height: 100%; }
-          .map-info-card { position: absolute; bottom: 16px; left: 16px; right: 16px; background: #fff; border-radius:
-  12px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 100; }
-          .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-          .card-header h3 { font-size: 18px; color: #FF6B35; }
-          .close-btn { background: none; border: none; font-size: 20px; color: #999; cursor: pointer; }
-          .card-address { font-size: 14px; color: #666; margin-bottom: 12px; }
-          .card-tags { display: flex; gap: 8px; margin-bottom: 12px; }
-          .tag { padding: 4px 10px; background: #F5F5F5; border-radius: 12px; font-size: 12px; }
-          .card-actions { display: flex; gap: 8px; }
-          .btn-primary { flex: 1; padding: 12px; background: #FF6B35; color: white; border: none; border-radius: 8px;
-  font-size: 15px; cursor: pointer; }
-          .btn-secondary { flex: 1; padding: 12px; background: #F5F5F5; border: 1px solid #E0E0E0; border-radius: 8px;
-  font-size: 15px; cursor: pointer; }
-
-          .restaurant-list { height: 100%; overflow-y: auto; padding: 12px; }
-          .restaurant-item { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0
-  2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px; cursor: pointer; }
-          .visit-status { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #E0E0E0; display: flex;
-  align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-          .visit-status.visited { background: #4CAF50; border-color: #4CAF50; color: white; }
-          .restaurant-info { flex: 1; min-width: 0; }
-          .restaurant-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow:
-  hidden; text-overflow: ellipsis; }
-          .restaurant-address { font-size: 13px; color: #666; white-space: nowrap; overflow: hidden; text-overflow:
-  ellipsis; }
-          .restaurant-meta { display: flex; gap: 8px; margin-top: 8px; }
-          .cuisine-tag { padding: 2px 8px; background: #F5F5F5; border-radius: 10px; font-size: 11px; }
-
-          .empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content:
-  center; color: #666; text-align: center; padding: 32px; }
-          .empty-icon { font-size: 64px; margin-bottom: 16px; }
-
-          .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none;
-  align-items: flex-end; justify-content: center; z-index: 1000; }
-          .modal.show { display: flex; }
-          .modal-content { background: #fff; width: 100%; max-height: 90vh; border-radius: 20px 20px 0 0; overflow:
-  hidden; display: flex; flex-direction: column; }
-          .modal-header { padding: 16px; border-bottom: 1px solid #E0E0E0; display: flex; justify-content:
-  space-between; align-items: center; }
-          form { padding: 16px; overflow-y: auto; flex: 1; }
-          .form-group { margin-bottom: 16px; }
-          .form-group label { display: block; font-size: 14px; margin-bottom: 6px; }
-          .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px
-  solid #E0E0E0; border-radius: 8px; font-size: 14px; }
-          .form-row { display: flex; gap: 12px; }
-          .form-row .form-group { flex: 1; }
-          .form-actions { display: flex; gap: 12px; margin-top: 8px; }
-          .btn-danger { padding: 12px 20px; background: #E53935; color: white; border: none; border-radius: 8px;
-  font-size: 15px; cursor: pointer; }
-
-          .detail-body { padding: 16px; overflow-y: auto; flex: 1; }
-          .detail-item { padding: 12px 0; border-bottom: 1px solid #E0E0E0; }
-          .detail-label { font-size: 12px; color: #666; margin-bottom: 4px; }
-          .detail-value { font-size: 15px; }
-          .detail-actions { padding: 16px; border-top: 1px solid #E0E0E0; display: flex; gap: 12px; }
-
-          .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8);
-  color: white; padding: 12px 24px; border-radius: 24px; font-size: 14px; z-index: 2000; display: none; }
-          .toast.show { display: block; }
-      </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>美食地图</title>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=52d44844a3d67363c77baf0d3269764e"></script>
+  <style>
+  body{font-family:system-ui;margin:0;background:#f5f5f5}
+  .header{background:#ff6b35;color:#fff;padding:15px;text-align:center}
+  .btn{background:#ff6b35;color:#fff;border:none;padding:10px 20px;border-radius:5px;margin:5px}
+  .item{background:#fff;margin:10px;padding:15px;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}
+  #map{height:400px;width:100%}
+  .hidden{display:none}
+  .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify
+  -content:center}
+  .modal.show{display:flex}
+  .modal-content{background:#fff;padding:20px;border-radius:10px;width:90%;max-width:400px}
+  input,select{width:100%;padding:10px;margin:5px 0;border:1px solid #ddd;border-radius:5px}
+  </style>
   </head>
   <body>
-      <div id="loading" class="loading">
-          <div class="loading-spinner"></div>
-          <p>正在加载...</p>
-      </div>
+  <div class="header">
+    <h2>🍜 美食地图</h2>
+    <button class="btn" onclick="showAdd()">添加店铺</button>
+  </div>
+  <div id="stats" style="text-align:center;padding:10px"></div>
+  <div id="map"></div>
+  <div id="list"></div>
 
-      <div id="app" class="hidden">
-          <header class="header">
-              <h1>🍜 美食地图</h1>
-              <div class="header-actions">
-                  <button class="icon-btn" onclick="app.sync()">🔄</button>
-                  <button class="icon-btn" onclick="app.openAdd()">➕</button>
-              </div>
-          </header>
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <h3>添加店铺</h3>
+      <input id="name" placeholder="店铺名称">
+      <input id="addr" placeholder="地址">
+      <input id="lat" type="number" step="any" placeholder="纬度">
+      <input id="lng" type="number" step="any" placeholder="经度">
+      <select id="type">
+        <option value="">选择类型</option>
+        <option>火锅</option>
+        <option>川菜</option>
+        <option>粤菜</option>
+        <option>日料</option>
+      </select>
+      <button class="btn" onclick="save()">保存</button>
+      <button class="btn" onclick="closeModal()" style="background:#999">取消</button>
+    </div>
+  </div>
 
-          <div class="stats-bar">
-              <div class="stat-item">
-                  <span class="stat-value" id="totalCount">0</span>
-                  <span class="stat-label">收藏店铺</span>
-              </div>
-              <div class="stat-item">
-                  <span class="stat-value" id="visitedCount">0</span>
-                  <span class="stat-label">已打卡</span>
-              </div>
-              <div class="stat-item">
-                  <span class="stat-value" id="pendingCount">0</span>
-                  <span class="stat-label">待打卡</span>
-              </div>
-          </div>
+  <script>
+  var data = JSON.parse(localStorage.getItem('fm') ||
+  '[{"id":1,"name":"示例-成都火锅","addr":"成都市锦江区","lat":30.65,"lng":104.06,"type":"火锅","visit":0}]');
+  var map;
 
-          <div class="filter-bar">
-              <div class="search-box">
-                  <input type="text" id="searchInput" placeholder="搜索店铺..." oninput="app.search(this.value)">
-              </div>
-              <select id="cuisineFilter" onchange="app.filter(this.value)">
-                  <option value="">全部</option>
-                  <option value="火锅">火锅</option>
-                  <option value="川菜">川菜</option>
-                  <option value="粤菜">粤菜</option>
-                  <option value="日料">日料</option>
-                  <option value="烧烤">烧烤</option>
-                  <option value="小吃">小吃</option>
-              </select>
-          </div>
+  function init() {
+    showStats();
+    showList();
+    if(typeof AMap!='undefined'){
+      map = new AMap.Map('map',{zoom:12,center:[104.06,30.65]});
+      showMarkers();
+    }
+  }
 
-          <div class="tab-bar">
-              <button class="tab-btn active" onclick="app.switchTab('map')">🗺️ 地图</button>
-              <button class="tab-btn" onclick="app.switchTab('list')">📋 列表</button>
-          </div>
+  function showStats() {
+    var v = data.filter(function(x){return x.visit}).length;
+    document.getElementById('stats').innerHTML = '共'+data.length+'家 | 已打卡'+v+'家';
+  }
 
-          <div id="mapView" class="tab-content active">
-              <div id="mapContainer"></div>
-              <div id="mapCard" class="map-info-card hidden">
-                  <div class="card-header">
-                      <h3 id="cardTitle">店铺</h3>
-                      <button class="close-btn" onclick="app.closeCard()">✕</button>
-                  </div>
-                  <p id="cardAddr" class="card-address"></p>
-                  <div class="card-actions">
-                      <button class="btn-secondary" onclick="app.showDetailFromCard()">详情</button>
-                      <button class="btn-primary" onclick="app.navigate()">导航到店</button>
-                  </div>
-              </div>
-          </div>
+  function showList() {
+    var h = '';
+    data.forEach(function(x){
+      h += '<div class="item" onclick="toggle('+x.id+')">';
+      h += '<b>'+x.name+'</b> ';
+      h += x.visit ? '✅' : '⭕';
+      h += '<br><small>'+x.addr+'</small>';
+      h += '</div>';
+    });
+    document.getElementById('list').innerHTML = h;
+  }
 
-          <div id="listView" class="tab-content">
-              <div id="list" class="restaurant-list"></div>
-              <div id="empty" class="empty-state hidden">
-                  <div class="empty-icon">🍽️</div>
-                  <p>还没有店铺</p>
-              </div>
-          </div>
-      </div>
+  function showMarkers() {
+    data.forEach(function(x){
+      var m = new AMap.Marker({position:[x.lng,x.lat],title:x.name});
+      m.setMap(map);
+    });
+  }
 
-      <div id="modal" class="modal">
-          <div class="modal-content">
-              <div class="modal-header">
-                  <h2 id="modalTitle">添加店铺</h2>
-                  <button class="close-btn" onclick="app.closeModal()">✕</button>
-              </div>
-              <form onsubmit="app.save(event)">
-                  <input type="hidden" id="editId">
-                  <div class="form-group">
-                      <label>店铺名称 *</label>
-                      <input type="text" id="inputName" required>
-                  </div>
-                  <div class="form-group">
-                      <label>地址 *</label>
-                      <input type="text" id="inputAddr" required>
-                  </div>
-                  <div class="form-row">
-                      <div class="form-group">
-                          <label>纬度 *</label>
-                          <input type="number" id="inputLat" step="any" required>
-                      </div>
-                      <div class="form-group">
-                          <label>经度 *</label>
-                          <input type="number" id="inputLng" step="any" required>
-                      </div>
-                  </div>
-                  <div class="form-row">
-                      <div class="form-group">
-                          <label>菜系</label>
-                          <select id="inputCuisine">
-                              <option value="">选择</option>
-                              <option>火锅</option>
-                              <option>川菜</option>
-                              <option>粤菜</option>
-                              <option>日料</option>
-                              <option>烧烤</option>
-                              <option>小吃</option>
-                              <option>其他</option>
-                          </select>
-                      </div>
-                      <div class="form-group">
-                          <label>人均消费</label>
-                          <input type="number" id="inputPrice">
-                      </div>
-                  </div>
-                  <div class="form-group">
-                      <label>电话</label>
-                      <input type="text" id="inputPhone">
-                  </div>
-                  <div class="form-group">
-                      <label>B站视频链接</label>
-                      <input type="url" id="inputVideo">
-                  </div>
-                  <div class="form-group">
-                      <label>营业时间</label>
-                      <input type="text" id="inputHours" placeholder="10:00-22:00">
-                  </div>
-                  <div class="form-group">
-                      <label>备注</label>
-                      <textarea id="inputNotes" rows="2"></textarea>
-                  </div>
-                  <div class="form-group">
-                      <label><input type="checkbox" id="inputVisited"> 已去过</label>
-                  </div>
-                  <div class="form-actions">
-                      <button type="button" class="btn-danger hidden" id="btnDelete"
-  onclick="app.delete()">删除</button>
-                      <button type="submit" class="btn-primary">保存</button>
-                  </div>
-              </form>
-          </div>
-      </div>
+  function showAdd() {
+    document.getElementById('modal').classList.add('show');
+  }
 
-      <div id="detailModal" class="modal">
-          <div class="modal-content">
-              <div class="modal-header">
-                  <h2 id="detailTitle">详情</h2>
-                  <button class="close-btn" onclick="app.closeDetail()">✕</button>
-              </div>
-              <div id="detailBody" class="detail-body"></div>
-              <div class="detail-actions">
-                  <button class="btn-secondary" onclick="app.edit()">编辑</button>
-                  <button class="btn-primary" onclick="app.navigate()">导航到店</button>
-              </div>
-          </div>
-      </div>
+  function closeModal() {
+    document.getElementById('modal').classList.remove('show');
+  }
 
-      <div id="toast" class="toast"></div>
+  function save() {
+    var o = {
+      id: Date.now(),
+      name: document.getElementById('name').value,
+      addr: document.getElementById('addr').value,
+      lat: parseFloat(document.getElementById('lat').value),
+      lng: parseFloat(document.getElementById('lng').value),
+      type: document.getElementById('type').value,
+      visit: 0
+    };
+    data.push(o);
+    localStorage.setItem('fm', JSON.stringify(data));
+    closeModal();
+    init();
+    alert('添加成功');
+  }
 
-      <script>
-          var app = {
-              data: [],
-              map: null,
-              markers: [],
-              current: null,
+  function toggle(id) {
+    var x = data.find(function(y){return y.id==id});
+    x.visit = !x.visit;
+    localStorage.setItem('fm', JSON.stringify(data));
+    init();
+  }
 
-              init: function() {
-                  this.load();
-                  this.initMap();
-                  this.render();
-                  document.getElementById('loading').classList.add('hidden');
-                  document.getElementById('app').classList.remove('hidden');
-              },
-
-              load: function() {
-                  var d = localStorage.getItem('foodmap');
-                  this.data = d ? JSON.parse(d) : [{
-                      id: 1, name: '示例-成都火锅', address: '成都市锦江区示例路1号',
-                      latitude: 30.6586, longitude: 104.0665, cuisineType: '火锅',
-                      averagePrice: 100, hasVisited: false
-                  }];
-                  this.save();
-              },
-
-              save: function() {
-                  localStorage.setItem('foodmap', JSON.stringify(this.data));
-                  this.updateStats();
-              },
-
-              initMap: function() {
-                  if (typeof AMap === 'undefined') return;
-                  this.map = new AMap.Map('mapContainer', { zoom: 12, center: [104.0665, 30.6586] });
-                  this.map.addControl(new AMap.Scale());
-                  this.updateMarkers();
-              },
-
-              updateMarkers: function() {
-                  if (!this.map) return;
-                  this.markers.forEach(function(m) { m.setMap(null); });
-                  this.markers = [];
-                  var self = this;
-                  this.data.forEach(function(r) {
-                      var m = new AMap.Marker({ position: [r.longitude, r.latitude], title: r.name });
-                      m.on('click', function() { self.showCard(r); });
-                      m.setMap(self.map);
-                      self.markers.push(m);
-                  });
-              },
-
-              showCard: function(r) {
-                  this.current = r;
-                  document.getElementById('cardTitle').textContent = r.name;
-                  document.getElementById('cardAddr').textContent = r.address;
-                  document.getElementById('mapCard').classList.remove('hidden');
-              },
-
-              closeCard: function() {
-                  document.getElementById('mapCard').classList.add('hidden');
-              },
-
-              switchTab: function(tab) {
-                  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-                  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
-                  event.target.classList.add('active');
-                  document.getElementById(tab + 'View').classList.add('active');
-                  if (tab === 'map' && this.map) { this.map.resize(); this.updateMarkers(); }
-              },
-
-              render: function() {
-                  var html = '', self = this;
-                  this.data.forEach(function(r) {
-                      html += '<div class="restaurant-item" onclick="app.clickItem(' + r.id + ', event)">';
-                      html += '<div class="visit-status ' + (r.hasVisited ? 'visited' : '') + '" onclick="app.toggle(' +
-   r.id + ', event)">';
-                      html += r.hasVisited ? '✓' : '';
-                      html += '</div>';
-                      html += '<div class="restaurant-info">';
-                      html += '<div class="restaurant-name">' + self.escape(r.name) + '</div>';
-                      html += '<div class="restaurant-address">' + self.escape(r.address) + '</div>';
-                      if (r.cuisineType) html += '<div class="restaurant-meta"><span class="cuisine-tag">' +
-  r.cuisineType + '</span></div>';
-                      html += '</div><span class="arrow">›</span></div>';
-                  });
-                  document.getElementById('list').innerHTML = html;
-                  document.getElementById('empty').classList.toggle('hidden', this.data.length > 0);
-                  this.updateStats();
-                  this.updateMarkers();
-              },
-
-              escape: function(t) {
-                  var d = document.createElement('div');
-                  d.textContent = t;
-                  return d.innerHTML;
-              },
-
-              clickItem: function(id, e) {
-                  if (e.target.classList.contains('visit-status')) return;
-                  this.current = this.data.find(function(x) { return x.id === id; });
-                  this.showDetail();
-              },
-
-              toggle: function(id, e) {
-                  e.stopPropagation();
-                  var r = this.data.find(function(x) { return x.id === id; });
-                  r.hasVisited = !r.hasVisited;
-                  this.save();
-                  this.render();
-                  this.showToast(r.hasVisited ? '已打卡' : '取消打卡');
-              },
-
-              showDetail: function() {
-                  var r = this.current;
-                  document.getElementById('detailTitle').textContent = r.name;
-                  var html = '';
-                  html += '<div class="detail-item"><div class="detail-label">地址</div><div class="detail-value">' +
-  r.address + '</div></div>';
-                  if (r.cuisineType) html += '<div class="detail-item"><div class="detail-label">菜系</div><div
-  class="detail-value">' + r.cuisineType + '</div></div>';
-                  if (r.averagePrice) html += '<div class="detail-item"><div class="detail-label">人均</div><div
-  class="detail-value">¥' + r.averagePrice + '</div></div>';
-                  if (r.phone) html += '<div class="detail-item"><div class="detail-label">电话</div><div
-  class="detail-value">' + r.phone + '</div></div>';
-                  if (r.videoUrl) html += '<div class="detail-item"><div class="detail-label">视频</div><div
-  class="detail-value"><a href="' + r.videoUrl + '" target="_blank" style="color:#FF6B35">点击观看↗</a></div></div>';
-                  html += '<div class="detail-item"><div class="detail-label">状态</div><div class="detail-value">' +
-  (r.hasVisited ? '✅已打卡' : '⭕未打卡') + '</div></div>';
-                  document.getElementById('detailBody').innerHTML = html;
-                  document.getElementById('detailModal').classList.add('show');
-              },
-
-              closeDetail: function() {
-                  document.getElementById('detailModal').classList.remove('show');
-              },
-
-              openAdd: function() {
-                  document.getElementById('modalTitle').textContent = '添加店铺';
-                  document.querySelector('form').reset();
-                  document.getElementById('editId').value = '';
-                  document.getElementById('btnDelete').classList.add('hidden');
-                  document.getElementById('modal').classList.add('show');
-              },
-
-              edit: function() {
-                  var r = this.current;
-                  document.getElementById('modalTitle').textContent = '编辑店铺';
-                  document.getElementById('editId').value = r.id;
-                  document.getElementById('inputName').value = r.name;
-                  document.getElementById('inputAddr').value = r.address;
-                  document.getElementById('inputLat').value = r.latitude;
-                  document.getElementById('inputLng').value = r.longitude;
-                  document.getElementById('inputCuisine').value = r.cuisineType;
-                  document.getElementById('inputPrice').value = r.averagePrice || '';
-                  document.getElementById('inputPhone').value = r.phone || '';
-                  document.getElementById('inputVideo').value = r.videoUrl || '';
-                  document.getElementById('inputHours').value = r.businessHours || '';
-                  document.getElementById('inputNotes').value = r.notes || '';
-                  document.getElementById('inputVisited').checked = r.hasVisited;
-                  document.getElementById('btnDelete').classList.remove('hidden');
-                  document.getElementById('detailModal').classList.remove('show');
-                  document.getElementById('modal').classList.add('show');
-              },
-
-              save: function(e) {
-                  e.preventDefault();
-                  var id = document.getElementById('editId').value;
-                  var r = {
-                      id: id ? parseInt(id) : Date.now(),
-                      name: document.getElementById('inputName').value,
-                      address: document.getElementById('inputAddr').value,
-                      latitude: parseFloat(document.getElementById('inputLat').value),
-                      longitude: parseFloat(document.getElementById('inputLng').value),
-                      cuisineType: document.getElementById('inputCuisine').value,
-                      averagePrice: parseInt(document.getElementById('inputPrice').value) || 0,
-                      phone: document.getElementById('inputPhone').value,
-                      videoUrl: document.getElementById('inputVideo').value,
-                      businessHours: document.getElementById('inputHours').value,
-                      notes: document.getElementById('inputNotes').value,
-                      hasVisited: document.getElementById('inputVisited').checked
-                  };
-                  if (id) {
-                      var idx = this.data.findIndex(function(x) { return x.id === parseInt(id); });
-                      if (idx !== -1) this.data[idx] = r;
-                  } else {
-                      this.data.push(r);
-                  }
-                  this.save();
-                  this.render();
-                  this.closeModal();
-                  this.showToast(id ? '修改成功' : '添加成功');
-              },
-
-              delete: function() {
-                  if (!confirm('确定删除？')) return;
-                  var id = parseInt(document.getElementById('editId').value);
-                  this.data = this.data.filter(function(x) { return x.id !== id; });
-                  this.save();
-                  this.render();
-                  this.closeModal();
-                  this.showToast('删除成功');
-              },
-
-              closeModal: function() {
-                  document.getElementById('modal').classList.remove('show');
-              },
-
-              navigate: function() {
-                  var r = this.current;
-                  var url = 'https://uri.amap.com/navigation?to=' + r.longitude + ',' + r.latitude + ',' +
-  encodeURIComponent(r.name);
-                  window.open(url, '_blank');
-              },
-
-              showDetailFromCard: function() {
-                  this.closeCard();
-                  this.showDetail();
-              },
-
-              updateStats: function() {
-                  var total = this.data.length;
-                  var visited = this.data.filter(function(x) { return x.hasVisited; }).length;
-                  document.getElementById('totalCount').textContent = total;
-                  document.getElementById('visitedCount').textContent = visited;
-                  document.getElementById('pendingCount').textContent = total - visited;
-              },
-
-              search: function(q) {
-                  var items = document.querySelectorAll('.restaurant-item');
-                  items.forEach(function(item) {
-                      var name = item.querySelector('.restaurant-name').textContent.toLowerCase();
-                      item.style.display = name.includes(q.toLowerCase()) ? 'flex' : 'none';
-                  });
-              },
-
-              filter: function(c) {
-                  var items = document.querySelectorAll('.restaurant-item');
-                  items.forEach(function(item) {
-                      if (!c) { item.style.display = 'flex'; return; }
-                      var tag = item.querySelector('.cuisine-tag');
-                      item.style.display = (tag && tag.textContent === c) ? 'flex' : 'none';
-                  });
-              },
-
-              sync: function() {
-                  this.showToast('同步功能开发中...');
-              },
-
-              showToast: function(msg) {
-                  var t = document.getElementById('toast');
-                  t.textContent = msg;
-                  t.classList.add('show');
-                  setTimeout(function() { t.classList.remove('show'); }, 2000);
-              }
-          };
-
-          document.addEventListener('DOMContentLoaded', function() {
-              app.init();
-          });
-      </script>
+  init();
+  </script>
   </body>
   </html>
